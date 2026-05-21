@@ -1,11 +1,11 @@
 import streamlit as st
 import random
 
-# 페이지 기본 설정 (태블릿/모바일 최적화 레이아웃)
+# 페이지 기본 설정
 st.set_page_config(page_title="영어 타이핑 퀘스트", page_icon="🐉", layout="centered")
 
-# 세션 상태 초기화
-if 'initialized' not in st.session_state:
+# 1. 세션 상태 초기화
+if 'quiz_data' not in st.session_state:
     st.session_state.quiz_data = [
         {"desc": "A fruit that is red and crunchy.", "answer": "apple"},
         {"desc": "The opposite of hot.", "answer": "cold"},
@@ -20,13 +20,11 @@ if 'initialized' not in st.session_state:
     st.session_state.exp = 0
     st.session_state.boss_hp = 100
     st.session_state.combo = 0
-    st.session_state.msg = ""          # 알림 메시지 저장용
-    st.session_state.msg_type = ""     # 알림 타입 (success / error)
-    st.session_state.initialized = True
+    st.session_state.last_result = "" # 결과 메시지 저장용
 
 st.title("🐉 보스 토벌전: 타이핑 마스터")
 
-# 상단 상태창
+# 2. 상단 스테이터스 표시
 st.subheader("보스 몬스터 HP")
 st.progress(st.session_state.boss_hp / 100)
 
@@ -38,14 +36,7 @@ with col2:
 
 st.divider()
 
-# 이전 턴의 결과 메시지가 있다면 폼 위에 출력 (에러 방지용)
-if st.session_state.msg:
-    if st.session_state.msg_type == "success":
-        st.success(st.session_state.msg)
-    elif st.session_state.msg_type == "error":
-        st.error(st.session_state.msg)
-
-# 게임 클리어 로직
+# 3. 게임 클리어 또는 진행 화면
 if st.session_state.boss_hp <= 0:
     st.balloons()
     st.success("🎉 축하합니다! 보스를 물리쳤습니다!")
@@ -53,30 +44,36 @@ if st.session_state.boss_hp <= 0:
         st.session_state.boss_hp = 100
         st.session_state.exp += 50
         st.session_state.combo = 0
-        st.session_state.msg = ""
+        st.session_state.last_result = ""
         st.session_state.current_q = random.choice(st.session_state.quiz_data)
         st.rerun()
 else:
+    # 퀴즈 힌트 출력
     st.info(f"💡 **힌트:** {st.session_state.current_q['desc']}")
     
-    with st.form("attack_form", clear_on_submit=True):
-        user_answer = st.text_input("정답을 영어로 입력하고 엔터를 누르세요:", autocomplete="off")
-        submitted = st.form_submit_button("공격 개시! ⚔️")
-        
-        if submitted:
+    # 입력창과 버튼 (st.form을 쓰지 않고 분리)
+    user_answer = st.text_input("정답을 영어로 입력하세요 (대소문자 상관없음):", key="answer_input")
+    
+    if st.button("공격 개시! ⚔️"):
+        if user_answer:
             if user_answer.strip().lower() == st.session_state.current_q['answer']:
                 st.session_state.combo += 1
                 damage = 10 + (st.session_state.combo * 2)
                 st.session_state.boss_hp = max(0, st.session_state.boss_hp - damage)
                 st.session_state.exp += 10
-                
-                # 메시지를 세션에 먼저 담아두고 리런
-                st.session_state.msg = f"💥 정답! {damage} 데미지를 입혔습니다!"
-                st.session_state.msg_type = "success"
+                st.session_state.last_result = f"success|💥 정답! {damage} 데미지를 입혔습니다!"
                 st.session_state.current_q = random.choice(st.session_state.quiz_data)
-                st.rerun()
             else:
                 st.session_state.combo = 0
-                st.session_state.msg = "💦 공격 실패! 오타를 확인해 보세요."
-                st.session_state.msg_type = "error"
-                st.rerun()
+                st.session_state.last_result = "error|💦 공격 실패! 오타를 확인해 보세요."
+            
+            # 입력창을 수동으로 비우기 위해 리런하지 않고 화면 갱신 유도
+            st.rerun()
+
+    # 4. 공격 결과 출력 영역 (가장 아래에 안정적으로 배치)
+    if st.session_state.last_result:
+        res_type, res_msg = st.session_state.last_result.split("|")
+        if res_type == "success":
+            st.success(res_msg)
+        else:
+            st.error(res_msg)
