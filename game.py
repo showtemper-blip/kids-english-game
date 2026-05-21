@@ -20,6 +20,8 @@ if 'initialized' not in st.session_state:
     st.session_state.exp = 0
     st.session_state.boss_hp = 100
     st.session_state.combo = 0
+    st.session_state.msg = ""          # 알림 메시지 저장용
+    st.session_state.msg_type = ""     # 알림 타입 (success / error)
     st.session_state.initialized = True
 
 st.title("🐉 보스 토벌전: 타이핑 마스터")
@@ -36,6 +38,13 @@ with col2:
 
 st.divider()
 
+# 이전 턴의 결과 메시지가 있다면 폼 위에 출력 (에러 방지용)
+if st.session_state.msg:
+    if st.session_state.msg_type == "success":
+        st.success(st.session_state.msg)
+    elif st.session_state.msg_type == "error":
+        st.error(st.session_state.msg)
+
 # 게임 클리어 로직
 if st.session_state.boss_hp <= 0:
     st.balloons()
@@ -44,25 +53,30 @@ if st.session_state.boss_hp <= 0:
         st.session_state.boss_hp = 100
         st.session_state.exp += 50
         st.session_state.combo = 0
+        st.session_state.msg = ""
         st.session_state.current_q = random.choice(st.session_state.quiz_data)
         st.rerun()
 else:
     st.info(f"💡 **힌트:** {st.session_state.current_q['desc']}")
-
+    
     with st.form("attack_form", clear_on_submit=True):
         user_answer = st.text_input("정답을 영어로 입력하고 엔터를 누르세요:", autocomplete="off")
         submitted = st.form_submit_button("공격 개시! ⚔️")
-
+        
         if submitted:
             if user_answer.strip().lower() == st.session_state.current_q['answer']:
                 st.session_state.combo += 1
                 damage = 10 + (st.session_state.combo * 2)
                 st.session_state.boss_hp = max(0, st.session_state.boss_hp - damage)
                 st.session_state.exp += 10
-                st.toast(f"정답! {damage} 데미지를 입혔습니다!", icon="💥")
+                
+                # 메시지를 세션에 먼저 담아두고 리런
+                st.session_state.msg = f"💥 정답! {damage} 데미지를 입혔습니다!"
+                st.session_state.msg_type = "success"
                 st.session_state.current_q = random.choice(st.session_state.quiz_data)
                 st.rerun()
             else:
                 st.session_state.combo = 0
-                st.toast("공격 실패! 오타를 확인해 보세요.", icon="💦")
+                st.session_state.msg = "💦 공격 실패! 오타를 확인해 보세요."
+                st.session_state.msg_type = "error"
                 st.rerun()
